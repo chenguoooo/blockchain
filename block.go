@@ -1,11 +1,27 @@
 package main
 
-import "crypto/sha256"
+import (
+	"crypto/sha256"
+	"time"
+)
 
 type Block struct {
+	Version uint64 //区块版本号
+
 	PrevBlockHash []byte //前区块哈希
-	Hash          []byte //当前区块哈希
-	Data          []byte //数据，目前使用字节流
+
+	MerkleRoot []byte //先填写为空
+
+	TimeStamp uint64 //从1970.1.1至今
+
+	Difficulity uint64 //挖矿难度
+
+	Nonce uint64 //随机数
+
+	Data []byte //数据，目前使用字节流
+
+	Hash []byte //当前区块哈希,区块中本不存在
+
 }
 
 const genesisInfo = "hello blockchain"
@@ -13,7 +29,12 @@ const genesisInfo = "hello blockchain"
 //创建区块，对Block的每个字段填充数据
 func NewBlock(data string, prevBlockHash []byte) *Block {
 	block := Block{
+		Version:       00,
 		PrevBlockHash: prevBlockHash,
+		MerkleRoot:    []byte{},
+		TimeStamp:     uint64(time.Now().Unix()),
+		Difficulity:   10,       //先随便写
+		Nonce:         10,       //先随便写
 		Hash:          []byte{}, //先填充为空，后续会填充数据
 		Data:          []byte(data),
 	}
