@@ -2,6 +2,7 @@
 
 # 创建区块，实现区块
 
+``` go
 package main
 
 import (
@@ -36,9 +37,11 @@ func main() {
 	fmt.Printf("Hash:%x\n", block.Hash)
 	fmt.Printf("Data:%s\n", block.Data)
 }
+```
 
 # 实现setHash函数
 
+``` go
 //为了生成区块哈希，实现一个简单的函数，来计算哈希值，没有随机值，没有难度值
 func (block *Block) SetHash() {
 	var data []byte
@@ -48,9 +51,11 @@ func (block *Block) SetHash() {
 	hash /*[32]byte*/ := sha256.Sum256(data)
 	block.Hash = hash[:]
 }
+```
 
 # 在NewBlock中调用
 
+``` go
 func NewBlock(data string, prevBlockHash []byte) *Block {
 	block := Block{
 		PrevBlockHash: prevBlockHash,
@@ -62,4 +67,4 @@ func NewBlock(data string, prevBlockHash []byte) *Block {
 
 	return &block
 }
-
+```
