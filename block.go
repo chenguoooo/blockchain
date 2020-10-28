@@ -47,8 +47,14 @@ func NewBlock(data string, prevBlockHash []byte) *Block {
 //为了生成区块哈希，实现一个简单的函数，来计算哈希值，没有随机值，没有难度值
 func (block *Block) SetHash() {
 	var data []byte
+	//uintToByte()将数字转成[]byte{},在utils.go实现
+	data = append(data, uintToByte(block.Version)...)
 	data = append(data, block.PrevBlockHash...)
+	data = append(data, block.MerkleRoot...)
+	data = append(data, uintToByte(block.TimeStamp)...)
+	data = append(data, uintToByte(block.Difficulity)...)
 	data = append(data, block.Data...)
+	data = append(data, uintToByte(block.Nonce)...)
 
 	hash /*[32]byte*/ := sha256.Sum256(data)
 	block.Hash = hash[:]
