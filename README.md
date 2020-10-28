@@ -1,6 +1,7 @@
 # blockchain
 
 # 创建区块，实现区块
+
 package main
 
 import (
@@ -37,6 +38,7 @@ func main() {
 }
 
 # 实现setHash函数
+
 //为了生成区块哈希，实现一个简单的函数，来计算哈希值，没有随机值，没有难度值
 func (block *Block) SetHash() {
 	var data []byte
@@ -48,6 +50,7 @@ func (block *Block) SetHash() {
 }
 
 # 在NewBlock中调用
+
 func NewBlock(data string, prevBlockHash []byte) *Block {
 	block := Block{
 		PrevBlockHash: prevBlockHash,
