@@ -211,3 +211,32 @@ func uintToByte(num uint64) []byte {
 
 }
 ```
+## 使用bytes.join改写函数
+``` go
+func (block *Block) SetHash() {
+	/*
+		var data []byte
+		//uintToByte()将数字转成[]byte{},在utils.go实现
+		data = append(data, uintToByte(block.Version)...)
+		data = append(data, block.PrevBlockHash...)
+		data = append(data, block.MerkleRoot...)
+		data = append(data, uintToByte(block.TimeStamp)...)
+		data = append(data, uintToByte(block.Difficulity)...)
+		data = append(data, block.Data...)
+		data = append(data, uintToByte(block.Nonce)...)
+	*/
+	tmp := [][]byte{
+		uintToByte(block.Version),
+		block.PrevBlockHash,
+		block.MerkleRoot,
+		uintToByte(block.TimeStamp),
+		uintToByte(block.Difficulity),
+		block.Data,
+		uintToByte(block.Nonce),
+	}
+	data := bytes.Join(tmp, []byte{})
+
+	hash /*[32]byte*/ := sha256.Sum256(data)
+	block.Hash = hash[:]
+}
+```
