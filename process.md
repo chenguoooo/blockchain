@@ -278,8 +278,6 @@ func NewProofOfWork(block *Block) *ProofOfWork {
 
 ## run函数实现
 ```go
-
-//这是pow的运算函数，为了获取挖矿的随机数，同时返回区块的哈希值
 func (pow *ProofOfWork) Run() ([]byte, uint64) {
 	//获取block数据
 	//拼接nonce
