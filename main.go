@@ -3,18 +3,18 @@ package main
 import "fmt"
 
 type Block struct {
-	PrevBlockHash []byte
-	Hash          []byte
-	Data          []byte
+	PrevBlockHash []byte //前区块哈希
+	Hash          []byte //当前区块哈希
+	Data          []byte //数据，目前使用字节流
 }
 
-const genesisInfo = "hello world"
+const genesisInfo = "hello blockchain"
 
 //创建区块，对Block的每个字段填充数据
 func NewBlock(data string, prevBlockHash []byte) *Block {
 	block := Block{
 		PrevBlockHash: prevBlockHash,
-		Hash:          []byte{}, //先填充为空，后续回填充数据
+		Hash:          []byte{}, //先填充为空，后续会填充数据
 		Data:          []byte(data),
 	}
 	return &block
