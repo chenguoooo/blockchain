@@ -137,3 +137,77 @@ type Block struct {
 
 }
 ```
+
+## 更新newblock函数
+``` go
+func NewBlock(data string, prevBlockHash []byte) *Block {
+	block := Block{
+		Version:       00,
+		PrevBlockHash: prevBlockHash,
+		MerkleRoot:    []byte{},
+		TimeStamp:     uint64(time.Now().Unix()),
+		Difficulity:   10,       //先随便写
+		Nonce:         10,       //先随便写
+		Hash:          []byte{}, //先填充为空，后续会填充数据
+		Data:          []byte(data),
+	}
+
+	block.SetHash()
+
+	return &block
+}
+```
+## 更新setHash函数
+``` go
+func (block *Block) SetHash() {
+	var data []byte
+	//uintToByte()将数字转成[]byte{},在utils.go实现
+	data = append(data, uintToByte(block.Version)...)
+	data = append(data, block.PrevBlockHash...)
+	data = append(data, block.MerkleRoot...)
+	data = append(data, uintToByte(block.TimeStamp)...)
+	data = append(data, uintToByte(block.Difficulity)...)
+	data = append(data, block.Data...)
+	data = append(data, uintToByte(block.Nonce)...)
+
+	hash /*[32]byte*/ := sha256.Sum256(data)
+	block.Hash = hash[:]
+}
+```
+## 添加空函数uintToByte
+创建新文件utils.go,内容入下
+``` go
+package main
+
+//这是一个工具函数文件
+
+func uintToByte(num uint64) []byte {
+	//TODO
+	//具体实现后面再写
+	return []byte{}
+
+}
+
+```
+## 编码逻辑实现
+```go
+package main
+
+import (
+	"bytes"
+	"encoding/binary"
+	"log"
+)
+
+func uintToByte(num uint64) []byte {
+	//使用binary.Write来进行编码
+	var buffer bytes.Buffer
+	err := binary.Write(&buffer, binary.BigEndian, num)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return buffer.Bytes()
+
+}
+```
