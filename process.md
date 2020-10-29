@@ -680,3 +680,94 @@ func (bc *BlockChain) AddBlock(data string) {
 
 }
 ```
+## 定义迭代器，创建迭代器
+```go 
+//定义一个区块链的迭代器，包含db，current
+type BlockChainIterator struct {
+	db      *bolt.DB
+	current []byte
+}
+
+//创建迭代器，使用bc进行初始化
+
+func (bc *BlockChain) NewIterator() *BlockChainIterator {
+
+	return &BlockChainIterator{bc.db, bc.tail}
+
+}
+```
+
+## Next实现
+```go
+
+func (it *BlockChainIterator) Next() *Block {
+
+	var block Block
+
+	it.db.View(func(tx *bolt.Tx) error {
+
+		b := tx.Bucket([]byte(blockBucketName))
+		if b == nil {
+			//如果b为空，说明该桶不存在，需要创建
+			fmt.Printf("bucket不存在，请检查!\n")
+			os.Exit(1)
+		}
+
+		//真正读取数据
+		blockInfo /*block的字节流*/ := b.Get(it.current)
+		block = *DeSerialize(blockInfo)
+
+		it.current = block.PrevBlockHash
+
+		return nil
+
+	})
+	return &block
+}
+```
+## 使用迭代器，更新main函数
+```go
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"time"
+)
+
+func main() {
+	//fmt.Printf("hello world")
+	//block := NewBlock(genesisInfo, []byte{0x0000000000000000})
+	bc := NewBlockChain()
+	defer bc.db.Close()
+	bc.AddBlock("hello itcast!!!")
+
+	it := bc.NewIterator()
+
+	for {
+		block := it.Next()
+		fmt.Printf("+++++++++++++++++++++++++++++++++++++\n")
+
+		fmt.Printf("Version:%d\n", block.Version)
+		fmt.Printf("PrevBlockHash:%x\n", block.PrevBlockHash)
+		fmt.Printf("MerkleRoot:%x\n", block.MerkleRoot)
+
+		timeFormat := time.Unix(int64(block.TimeStamp), 0).Format("2006-01-02 15:04:05")
+		fmt.Printf("TimeStamp:%s\n", timeFormat)
+
+		fmt.Printf("Difficulity:%d\n", block.Difficulity)
+		fmt.Printf("Nonce:%d\n", block.Nonce)
+		fmt.Printf("Hash:%x\n", block.Hash)
+		fmt.Printf("Data:%s\n", block.Data)
+
+		pow := NewProofOfWork(block)
+		fmt.Printf("Isvalid:%v\n", pow.IsValid())
+
+		if bytes.Equal(block.PrevBlockHash, []byte{}) {
+			fmt.Printf("区块链遍历结束！\n")
+			break
+		}
+	}
+
+}
+```
