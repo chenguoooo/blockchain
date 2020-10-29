@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"log"
 	"time"
 )
@@ -69,7 +68,7 @@ func (block *Block) Serialize() []byte {
 }
 func DeSerialize(data []byte) *Block {
 
-	fmt.Printf("解码传入的数据:%x\n", data)
+	//fmt.Printf("解码传入的数据:%x\n", data)
 
 	var block Block
 

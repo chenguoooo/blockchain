@@ -81,7 +81,7 @@ func (pow *ProofOfWork) Run() ([]byte, uint64) {
 		//   +1 if x >  y
 		if bigIntTmp.Cmp(pow.target) == -1 {
 			//此时x<y,挖矿成功
-			fmt.Printf("挖矿成功！nonce：%d,哈希值为：%x\n", nonce, hash)
+			fmt.Printf("挖矿成功！nonce：%d,哈希值为：%x\n\n", nonce, hash)
 			break
 		} else {
 			nonce++

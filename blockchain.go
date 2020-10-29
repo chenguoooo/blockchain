@@ -114,3 +114,42 @@ func (bc *BlockChain) AddBlock(data string) {
 	})
 
 }
+
+//定义一个区块链的迭代器，包含db，current
+type BlockChainIterator struct {
+	db      *bolt.DB
+	current []byte //当前所指向区块的哈希值
+}
+
+//创建迭代器，使用bc进行初始化
+
+func (bc *BlockChain) NewIterator() *BlockChainIterator {
+
+	return &BlockChainIterator{bc.db, bc.tail}
+
+}
+
+func (it *BlockChainIterator) Next() *Block {
+
+	var block Block
+
+	it.db.View(func(tx *bolt.Tx) error {
+
+		b := tx.Bucket([]byte(blockBucketName))
+		if b == nil {
+			//如果b为空，说明该桶不存在，需要创建
+			fmt.Printf("bucket不存在，请检查!\n")
+			os.Exit(1)
+		}
+
+		//真正读取数据
+		blockInfo /*block的字节流*/ := b.Get(it.current)
+		block = *DeSerialize(blockInfo)
+
+		it.current = block.PrevBlockHash
+
+		return nil
+
+	})
+	return &block
+}
