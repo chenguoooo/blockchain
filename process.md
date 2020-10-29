@@ -771,3 +771,128 @@ func main() {
 
 }
 ```
+## 命令行demo
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+func main() {
+	cmds := os.Args
+
+	for i, cmd := range cmds {
+		fmt.Printf("cmd[%d]:%s\n", i, cmd)
+	}
+}
+```
+## 定义CLI结构，run方法框架搭建
+```go 
+
+const Usage = `
+	blockchain addBlock "xxxxx"	添加数据到区块链
+	blockchain printChain		打印区块链
+`
+
+type CLI struct {
+	bc *BlockChain
+}
+
+//给CLI提供一个方法，进行命令解析，从而执行调度
+func (cli *CLI) Run() {
+	cmds := os.Args
+
+	if len(cmds) < 2 {
+		fmt.Printf(Usage)
+		os.Exit(1)
+	}
+
+	switch cmds[1] {
+	case "addBlock":
+		fmt.Printf("添加区块链命令被调用，数据：%s\n", cmds[2])
+	case "printChain":
+		fmt.Printf("打印区块链命令被调用\n")
+	default:
+		fmt.Printf("无效命令，请检查\n")
+		fmt.Printf(Usage)
+
+	}
+}
+```
+
+## 改写主函数
+```go
+package main
+
+func main() {
+	bc := NewBlockChain()
+	defer bc.db.Close()
+	cli := CLI{bc}
+	cli.Run()
+}
+```
+## 更新run函数
+
+``` go
+
+//给CLI提供一个方法，进行命令解析，从而执行调度
+func (cli *CLI) Run() {
+	cmds := os.Args
+
+	if len(cmds) < 2 {
+		fmt.Printf(Usage)
+		os.Exit(1)
+	}
+
+	switch cmds[1] {
+	case "addBlock":
+		fmt.Printf("添加区块链命令被调用，数据：%s\n", cmds[2])
+		data := cmds[2]
+		cli.AddBlock(data)
+	case "printChain":
+		fmt.Printf("打印区块链命令被调用\n")
+		cli.PrintChain()
+	default:
+		fmt.Printf("无效命令，请检查\n")
+		fmt.Printf(Usage)
+
+	}
+}
+
+```
+## 添加command.go
+``` go
+
+func (cli *CLI) PrintChain() {
+
+	it := cli.bc.NewIterator()
+
+	for {
+		block := it.Next()
+		fmt.Printf("+++++++++++++++++++++++++++++++++++++\n")
+
+		fmt.Printf("Version:%d\n", block.Version)
+		fmt.Printf("PrevBlockHash:%x\n", block.PrevBlockHash)
+		fmt.Printf("MerkleRoot:%x\n", block.MerkleRoot)
+
+		timeFormat := time.Unix(int64(block.TimeStamp), 0).Format("2006-01-02 15:04:05")
+		fmt.Printf("TimeStamp:%s\n", timeFormat)
+
+		fmt.Printf("Difficulity:%d\n", block.Difficulity)
+		fmt.Printf("Nonce:%d\n", block.Nonce)
+		fmt.Printf("Hash:%x\n", block.Hash)
+		fmt.Printf("Data:%s\n", block.Data)
+
+		pow := NewProofOfWork(block)
+		fmt.Printf("Isvalid:%v\n", pow.IsValid())
+
+		if bytes.Equal(block.PrevBlockHash, []byte{}) {
+			fmt.Printf("区块链遍历结束！\n")
+			break
+		}
+	}
+
+}
+```
