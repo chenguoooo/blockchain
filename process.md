@@ -496,3 +496,187 @@ func main() {
 }
 ```
 
+## 改写区块链，获取区块链实例
+```go
+
+//使用blot改写
+type BlockChain struct {
+	db *bolt.DB //句柄
+
+	tail []byte //最后一个区块hash值
+}
+
+//实现创建区块链方法
+func NewBlockChain() *BlockChain {
+	//在创建的时候添加一个区块：创世块
+	//genesisBlock := NewBlock(genesisInfo, []byte{0x0000000000000000})
+	//bc := BlockChain{Blocks: []*Block{genesisBlock}}
+	//return &bc
+
+	//功能分析
+	//1.获得数据库句柄，打开数据库，读写数据
+	//判断是否有bucket，如果没有，创建bucket
+	//写入创世块
+	//写入lasthashkey这条数据
+	//更新tail为最后一个区块的哈希
+	//返回bc实例
+	db, err := bolt.Open("blockChain.db", 0600, nil)
+	//向数据库中写入数据
+	//从数据库中读取数据
+
+	if err != nil {
+		log.Panic(err)
+	}
+
+	defer db.Close()
+
+	var tail []byte
+
+	db.Update(func(tx *bolt.Tx) error {
+
+		b := tx.Bucket([]byte("blockBucket"))
+
+		if b == nil {
+			//如果b为空，说明该桶不存在，需要创建
+			fmt.Printf("bucket不存在，准备创建!\n")
+			b, err = tx.CreateBucket([]byte("blockBucket"))
+
+			if err != nil {
+				log.Panic(err)
+			}
+
+			//抽屉准备完毕，开始添加创世块
+			genesisBlock := NewBlock(genesisInfo, []byte{})
+			b.Put(genesisBlock.Hash, genesisBlock.toBytes() /*将区块序列化，转成字节流*/)
+			b.Put([]byte("lastHashKey"), genesisBlock.Hash)
+
+			tail = genesisBlock.Hash
+
+		} else {
+			//2.获取最后一个区块哈希值
+			//填充给tail
+			//返回bc实例
+			tail = b.Get([]byte("lastHashKey"))
+		}
+
+		return nil
+
+	})
+
+	return &BlockChain{db, tail}
+
+}
+```
+## gobTest.go
+package main
+
+import (
+	"bytes"
+	"encoding/gob"
+	"fmt"
+	"log"
+)
+
+//gob是go语言内置的编码包
+//它可以对任意数据类型进行编码和解码
+//编码时，先要创建编码器，编码器进行编码
+//解码时，先要创建解码器，解码器进行解码
+
+type Person struct {
+	Name string
+	Age  uint64
+}
+
+func main() {
+	Jim := Person{
+		Name: "Jim",
+		Age:  19,
+	}
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+	err := encoder.Encode(&Jim)
+	if err != nil {
+		log.Panic(err)
+	}
+	fmt.Printf("编码后的数据%x\n", buffer.Bytes())
+
+	//传输中
+
+	//解码，将字节六转换成Person结构
+	var p1 Person
+
+	//创建解码器
+	decoder := gob.NewDecoder(bytes.NewReader(buffer.Bytes()))
+	err = decoder.Decode(&p1)
+	if err != nil {
+		log.Panic(err)
+	}
+	fmt.Printf("解码后的数据%v\n", p1)
+}
+
+## 编码解码区块
+``` go
+
+//序列化，将区块转换成字节流
+func (block *Block) Serialize() []byte {
+
+	var buffer bytes.Buffer
+
+	//定义编码器
+	encoder := gob.NewEncoder(&buffer)
+
+	//编码器对结构进行编码，一定要进行校验
+	err := encoder.Encode(block)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return buffer.Bytes()
+}
+func DeSerialize(data []byte) *Block {
+
+	fmt.Printf("解码传入的数据:%x\n", data)
+
+	var block Block
+
+	//创建解码器
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+
+	err := decoder.Decode(&block)
+	if err != nil {
+		log.Panic(err)
+	}
+	return &block
+}
+```
+
+## 更新addblock
+```go
+
+
+//添加区块
+
+func (bc *BlockChain) AddBlock(data string) {
+	//创建一个区块
+	bc.db.Update(func(tx *bolt.Tx) error {
+
+		b := tx.Bucket([]byte("blockBucket"))
+
+		if b == nil {
+			//如果b为空，说明该桶不存在，需要创建
+			fmt.Printf("bucket不存在，请检查!\n")
+			os.Exit(1)
+		}
+
+		block := NewBlock(data, bc.tail)
+		b.Put(block.Hash, block.Serialize() /*将区块序列化，转成字节流*/)
+		b.Put([]byte("lastHashKey"), block.Hash)
+
+		bc.tail = block.Hash
+
+		return nil
+
+	})
+
+}
+```
