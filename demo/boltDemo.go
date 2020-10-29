@@ -22,6 +22,7 @@ func main() {
 
 		if b1 == nil {
 			//如果b1为空，说明该桶不存在，需要创建
+
 			b1, err = tx.CreateBucket([]byte("bucketname1"))
 			if err != nil {
 				log.Panic(err)

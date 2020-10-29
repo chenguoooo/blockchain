@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/gob"
+	"fmt"
+	"log"
 	"time"
 )
 
@@ -47,31 +51,34 @@ func NewBlock(data string, prevBlockHash []byte) *Block {
 	return &block
 }
 
-//
-////为了生成区块哈希，实现一个简单的函数，来计算哈希值，没有随机值，没有难度值
-//func (block *Block) SetHash() {
-//	/*
-//		var data []byte
-//		//uintToByte()将数字转成[]byte{},在utils.go实现
-//		data = append(data, uintToByte(block.Version)...)
-//		data = append(data, block.PrevBlockHash...)
-//		data = append(data, block.MerkleRoot...)
-//		data = append(data, uintToByte(block.TimeStamp)...)
-//		data = append(data, uintToByte(block.Difficulity)...)
-//		data = append(data, block.Data...)
-//		data = append(data, uintToByte(block.Nonce)...)
-//	*/
-//	tmp := [][]byte{
-//		uintToByte(block.Version),
-//		block.PrevBlockHash,
-//		block.MerkleRoot,
-//		uintToByte(block.TimeStamp),
-//		uintToByte(block.Difficulity),
-//		block.Data,
-//		uintToByte(block.Nonce),
-//	}
-//	data := bytes.Join(tmp, []byte{})
-//
-//	hash /*[32]byte*/ := sha256.Sum256(data)
-//	block.Hash = hash[:]
-//}
+//序列化，将区块转换成字节流
+func (block *Block) Serialize() []byte {
+
+	var buffer bytes.Buffer
+
+	//定义编码器
+	encoder := gob.NewEncoder(&buffer)
+
+	//编码器对结构进行编码，一定要进行校验
+	err := encoder.Encode(block)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return buffer.Bytes()
+}
+func DeSerialize(data []byte) *Block {
+
+	fmt.Printf("解码传入的数据:%x\n", data)
+
+	var block Block
+
+	//创建解码器
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+
+	err := decoder.Decode(&block)
+	if err != nil {
+		log.Panic(err)
+	}
+	return &block
+}
