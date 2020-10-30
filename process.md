@@ -1269,3 +1269,259 @@ func (cli *CLI) Send(from string, to string, amount float64, miner string, data 
 	fmt.Printf("挖矿成功!\n")
 }
 ```
+## 定义UTXOInfo
+```go
+type UTXOInfo struct {
+	TXID   []byte   //交易id
+	Index  int64    //output的索引值
+	Output TXOutput //output本身
+}
+```
+## 改写FindMyUtxos
+```go
+
+func (bc *BlockChain) FindMyUtxos(address string) []UTXOInfo {
+
+	fmt.Printf("FindMyUtxos\n")
+	//var UTXOs []TXOutput //
+	var UTXOInfos []UTXOInfo //新的返回结构
+
+	it := bc.NewIterator()
+
+	//这是标识已经消耗过的utxo结构，key是交易id，value是这个id里面的output索引的数组
+	spentUTXOs := make(map[string][]int64)
+
+	//1.遍历账本
+	for {
+		block := it.Next()
+
+		//2.遍历交易
+		for _, tx := range block.Transactions {
+			//遍历交易输入：inputs
+			for _, input := range tx.TXInputs {
+				if input.Address == address {
+					fmt.Printf("找到了消耗过的output！index:%d\n", input.Index)
+					key := string(input.TXID)
+					spentUTXOs[key] = append(spentUTXOs[key], input.Index)
+
+				}
+			}
+		OUTPUT:
+			//3.遍历output
+			for i, output := range tx.TXOutputs {
+				key := string(tx.Txid)
+				indexs := spentUTXOs[key]
+				if len(indexs) != 0 {
+					fmt.Printf("当前这笔交易中有被消耗过的output！\n")
+					for _, j := range indexs {
+						if int64(i) == j {
+							fmt.Printf("i=j,当前的output已经被消耗过了，跳过不统计")
+							continue OUTPUT
+						}
+
+					}
+
+				}
+
+				//4.找到所有属于账户的output
+				if address == output.Address {
+					fmt.Printf("找到了属于%s的output，i:%d\n", address, i)
+					//UTXOs = append(UTXOs, output)
+					utxoinfo := UTXOInfo{tx.Txid, int64(i), output}
+					UTXOInfos = append(UTXOInfos, utxoinfo)
+				}
+
+			}
+		}
+
+		if len(block.PrevBlockHash) == 0 {
+			fmt.Printf("遍历区块链结束!\n")
+			break
+		}
+	}
+
+	return UTXOInfos
+}
+```
+
+## 改写FindNeedUtxos
+```go
+
+func (bc *BlockChain) FindNeedUtxos(from string, amount float64) (map[string][]int64, float64) {
+
+	needUtxos := make(map[string][]int64)
+	var resValue float64 //统计的金额
+
+	//复用Findmyutxo函数，这个函数已经包含所有信息
+	utxoinfos := bc.FindMyUtxos(from)
+	for _, utxoinfo := range utxoinfos {
+		key := string(utxoinfo.TXID)
+		needUtxos[key] = append(needUtxos[key], int64(utxoinfo.Index))
+		resValue += utxoinfo.Output.Value
+
+		//判断金额是否足够
+		if resValue >= amount {
+			break
+		}
+
+	}
+	return needUtxos, resValue
+}
+```
+## IsCoinbase实现
+```go
+
+func (tx *Transaction) IsCoinbase() bool {
+	//特点：1、只有一个input 2、引用的id是nil 3、引用的索引是-1
+	inputs := tx.TXInputs
+	if len(inputs) == 1 && inputs[0].TXID == nil && inputs[0].Index == -1 {
+		return true
+	}
+
+	return false
+
+}
+```
+## 在遍历inputs时使用
+``` go
+//2.遍历交易
+		for _, tx := range block.Transactions {
+			//遍历交易输入：inputs
+
+			if tx.IsCoinbase() == false {
+				//如果不是coinbase，说明是普通交易，才有必要进行遍历
+				for _, input := range tx.TXInputs {
+					if input.Address == address {
+						fmt.Printf("找到了消耗过的output！index:%d\n", input.Index)
+						key := string(input.TXID)
+						spentUTXOs[key] = append(spentUTXOs[key], input.Index)
+
+					}
+				}
+			}
+			
+```
+## 创建区块链函数 
+```go
+
+func CreatBlockChain(miner string) *BlockChain {
+
+	//功能分析
+	//1.获得数据库句柄，打开数据库，读写数据
+
+	db, err := bolt.Open(blockChainName, 0600, nil)
+	//向数据库中写入数据
+	//从数据库中读取数据
+
+	if err != nil {
+		log.Panic(err)
+	}
+
+	//defer db.Close()
+
+	var tail []byte
+
+	db.Update(func(tx *bolt.Tx) error {
+
+		b := tx.Bucket([]byte(blockBucketName))
+
+		b, err := tx.CreateBucket([]byte(blockBucketName))
+
+		if err != nil {
+			log.Panic(err)
+		}
+
+		//抽屉准备完毕，开始添加创世块
+		//创世块中只有一个挖矿交易
+		coinbase := NewCoinbaseTx(miner, genesisInfo)
+
+		genesisBlock := NewBlock([]*Transaction{coinbase}, []byte{})
+		b.Put(genesisBlock.Hash, genesisBlock.Serialize() /*将区块序列化，转成字节流*/)
+		b.Put([]byte(lastHashKey), genesisBlock.Hash)
+
+		//为了测试，把写入的数据读取出来，如果没问题，注释掉
+		//blockInfo := b.Get(genesisBlock.Hash)
+		//block := DeSerialize(blockInfo)
+		//fmt.Printf("解码后的blcok数据:%s\n", block)
+
+		tail = genesisBlock.Hash
+
+		return nil
+
+	})
+
+	return &BlockChain{db, tail}
+
+}
+```
+## 获取实例
+```go
+
+//返回区块链实例
+func NewBlockChain() *BlockChain {
+
+	//功能分析
+	//1.获得数据库句柄，打开数据库，读写数据
+
+	db, err := bolt.Open(blockChainName, 0600, nil)
+	if err != nil {
+		log.Panic(err)
+	}
+	//defer db.Close()
+	var tail []byte
+	db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(blockBucketName))
+		if b == nil {
+			fmt.Printf("区块链bucket为空，请检查!\n")
+			os.Exit(1)
+		}
+		tail = b.Get([]byte(lastHashKey))
+		return nil
+	})
+	return &BlockChain{db, tail}
+
+}
+```
+
+## 添加CreatBlockChain命令
+```go
+func (cli *CLI) CreatBlockChain(addr string) {
+	bc := CreatBlockChain(addr)
+	bc.db.Close()
+	fmt.Printf("创建区块链成功!\n")
+
+}
+```
+## 主函数
+```go
+func main() {
+	//bc := NewBlockChain("cg")
+	//defer bc.db.Close()
+	//cli := CLI{bc}
+	cli := CLI{}
+	cli.Run()
+}
+```
+
+
+## 在程序中调用NewBlockChain，例如
+```go
+
+func (cli *CLI) GetBalance(addr string) {
+	bc := NewBlockChain()
+	defer bc.db.Close()
+	bc.GetBalance(addr)
+}
+```
+## 判断文件是否存在
+```go
+
+//判断文件是否存在
+func IsFileExist(fileName string) bool {
+	_, err := os.Stat(fileName)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+```
