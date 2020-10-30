@@ -7,13 +7,15 @@ import (
 )
 
 const Usage = `
-	./blockchain printChain	打印区块链
-	./blockchain getBalance	地址获取地址的余额
-	./blockchain send FROM TO AMOUNT MINER DATA	转账命令
+	./blockchain CreatBlockChain 地址		"创建区块链"
+	./blockchain printChain				"打印区块链"
+	./blockchain getBalance	地址			"获取地址的余额"
+	./blockchain send FROM TO AMOUNT MINER DATA	"转账命令"
 `
 
 type CLI struct {
-	bc *BlockChain
+	//bc *BlockChain
+	//CLI中不需要保存区块链实例了，所有名字在自己调用前，自己获取区块链实例
 }
 
 //给CLI提供一个方法，进行命令解析，从而执行调度
@@ -26,15 +28,14 @@ func (cli *CLI) Run() {
 	}
 
 	switch cmds[1] {
-	case "addBlock":
+	case "CreatBlockChain":
 		if len(cmds) != 3 {
 			fmt.Printf(Usage)
 			os.Exit(1)
 		}
-		fmt.Printf("添加区块链命令被调用，数据：%s\n", cmds[2])
-		//
-		//data := cmds[2]
-		//cli.AddBlock(data)//TODO
+		fmt.Printf("创建区块链命令被调用\n")
+		addr := cmds[2]
+		cli.CreatBlockChain(addr)
 
 	case "printChain":
 		fmt.Printf("打印区块链命令被调用\n")
@@ -42,7 +43,7 @@ func (cli *CLI) Run() {
 
 	case "getBalance":
 		fmt.Printf("获取余额命令被调用\n")
-		cli.bc.GetBalance(cmds[2])
+		cli.GetBalance(cmds[2])
 
 	case "send":
 		fmt.Printf("转账命令被调用\n")

@@ -7,14 +7,31 @@ import (
 )
 
 //实现具体的命令
-func (cli *CLI) AddBlock(txs []*Transaction) {
-	cli.bc.AddBlock(txs)
-	fmt.Printf("添加区块成功!\n")
+func (cli *CLI) CreatBlockChain(addr string) {
+	bc := CreatBlockChain(addr)
+	if bc != nil {
+		defer bc.db.Close()
+	}
+	fmt.Printf("创建区块链成功!\n")
 
 }
-func (cli *CLI) PrintChain() {
 
-	it := cli.bc.NewIterator()
+func (cli *CLI) GetBalance(addr string) {
+	bc := NewBlockChain()
+	if bc == nil {
+		return
+	}
+
+	bc.GetBalance(addr)
+}
+
+func (cli *CLI) PrintChain() {
+	bc := NewBlockChain()
+	if bc == nil {
+		return
+	}
+
+	it := bc.NewIterator()
 
 	for {
 		block := it.Next()
@@ -30,7 +47,7 @@ func (cli *CLI) PrintChain() {
 		fmt.Printf("Difficulity:%d\n", block.Difficulity)
 		fmt.Printf("Nonce:%d\n", block.Nonce)
 		fmt.Printf("Hash:%x\n", block.Hash)
-		fmt.Printf("Data:%s\n", block.Transactions[0].TXInputs[0].Address) //TODO
+		fmt.Printf("Data:%s\n", block.Transactions[0].TXInputs[0].Address)
 
 		pow := NewProofOfWork(block)
 		fmt.Printf("Isvalid:%v\n", pow.IsValid())
@@ -44,15 +61,15 @@ func (cli *CLI) PrintChain() {
 }
 
 func (cli *CLI) Send(from string, to string, amount float64, miner string, data string) {
-	//创建挖矿交易
-	//创建普通交易
-	//添加到区块
-
+	bc := NewBlockChain()
+	if bc == nil {
+		return
+	}
 	//1.创建挖矿者
 	coinbase := NewCoinbaseTx(miner, data)
 
 	//2.创建普通交易
-	tx := NewTransaction(from, to, amount, cli.bc)
+	tx := NewTransaction(from, to, amount, bc)
 
 	txs := []*Transaction{coinbase}
 
@@ -63,7 +80,7 @@ func (cli *CLI) Send(from string, to string, amount float64, miner string, data 
 	}
 
 	//3.添加到区块
-	cli.bc.AddBlock(txs)
+	bc.AddBlock(txs)
 
 	fmt.Printf("挖矿成功!\n")
 }

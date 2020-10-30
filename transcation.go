@@ -56,6 +56,17 @@ func NewCoinbaseTx(miner string, data string) *Transaction {
 	return &tx
 }
 
+func (tx *Transaction) IsCoinbase() bool {
+	//特点：1、只有一个input 2、引用的id是nil 3、引用的索引是-1
+	inputs := tx.TXInputs
+	if len(inputs) == 1 && inputs[0].TXID == nil && inputs[0].Index == -1 {
+		return true
+	}
+
+	return false
+
+}
+
 //内部逻辑：
 
 func NewTransaction(from, to string, amount float64, bc *BlockChain) *Transaction {
