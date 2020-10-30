@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"log"
 	"time"
@@ -20,26 +21,51 @@ type Block struct {
 
 	Nonce uint64 //随机数
 
-	Data []byte //数据，目前使用字节流
+	//Data []byte //数据，目前使用字节流
+	Transactions []*Transaction
 
 	Hash []byte //当前区块哈希,区块中本不存在
 
 }
 
-const genesisInfo = "0_chen"
+//模拟梅克尔根，做一个简单的处理
+func (block *Block) HashTransactions() {
+	//交易的id就是交易的哈希值，所以可以将id拼接起来，整体做一个哈希运算，作为Merkleroot
+	var hashes []byte
+	for _, tx := range block.Transactions {
+		txid /*[]byte*/ := tx.Txid
+		hashes = append(hashes, txid...)
+	}
+	hash := sha256.Sum256(hashes)
+	block.MerkleRoot = hash[:]
+
+}
+
+const genesisInfo = "chen"
 
 //创建区块，对Block的每个字段填充数据
-func NewBlock(data string, prevBlockHash []byte) *Block {
+func NewBlock(txs []*Transaction, prevBlockHash []byte) *Block {
 	block := Block{
-		Version:       00,
+		Version: 00,
+
 		PrevBlockHash: prevBlockHash,
-		MerkleRoot:    []byte{},
-		TimeStamp:     uint64(time.Now().Unix()),
-		Difficulity:   Bits, //先随便写
+
+		MerkleRoot: []byte{},
+
+		TimeStamp: uint64(time.Now().Unix()),
+
+		Difficulity: Bits, //先随便写
+
 		//Nonce:         10,       //先随便写
+
+		//Data: []byte(data),
+		Transactions: txs,
+
 		Hash: []byte{}, //先填充为空，后续会填充数据
-		Data: []byte(data),
+
 	}
+
+	block.HashTransactions()
 
 	//block.SetHash()
 	pow := NewProofOfWork(&block)

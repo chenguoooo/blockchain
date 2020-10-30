@@ -7,8 +7,8 @@ import (
 )
 
 //实现具体的命令
-func (cli *CLI) AddBlock(data string) {
-	cli.bc.AddBlock(data)
+func (cli *CLI) AddBlock(txs []*Transaction) {
+	cli.bc.AddBlock(txs)
 	fmt.Printf("添加区块成功!\n")
 
 }
@@ -30,7 +30,7 @@ func (cli *CLI) PrintChain() {
 		fmt.Printf("Difficulity:%d\n", block.Difficulity)
 		fmt.Printf("Nonce:%d\n", block.Nonce)
 		fmt.Printf("Hash:%x\n", block.Hash)
-		fmt.Printf("Data:%s\n", block.Data)
+		fmt.Printf("Data:%s\n", block.Transactions[0].TXInputs[0].Address) //TODO
 
 		pow := NewProofOfWork(block)
 		fmt.Printf("Isvalid:%v\n", pow.IsValid())
@@ -41,4 +41,29 @@ func (cli *CLI) PrintChain() {
 		}
 	}
 
+}
+
+func (cli *CLI) Send(from string, to string, amount float64, miner string, data string) {
+	//创建挖矿交易
+	//创建普通交易
+	//添加到区块
+
+	//1.创建挖矿者
+	coinbase := NewCoinbaseTx(miner, data)
+
+	//2.创建普通交易
+	tx := NewTransaction(from, to, amount, cli.bc)
+
+	txs := []*Transaction{coinbase}
+
+	if tx != nil {
+		txs = append(txs, tx)
+	} else {
+		fmt.Printf("发现无效交易，过滤!\n")
+	}
+
+	//3.添加到区块
+	cli.bc.AddBlock(txs)
+
+	fmt.Printf("挖矿成功!\n")
 }

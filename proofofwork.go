@@ -101,9 +101,9 @@ func (pow *ProofOfWork) prepareData(nonce uint64) []byte {
 		block.MerkleRoot,
 		uintToByte(block.TimeStamp),
 		uintToByte(block.Difficulity),
-		block.Data,
 		uintToByte(nonce),
 	}
+	//比特币做hash，是对区块头做hash
 
 	data := bytes.Join(tmp, []byte{})
 	return data

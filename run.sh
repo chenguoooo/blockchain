@@ -1,6 +1,6 @@
-
+#!/bin/bash
 rm blockchain
-rm blockchain.db
+rm *.db
 
-go build -o blockchain.exe
-blockchain.exe
+go build -o blockchain *.go
+./blockchain
