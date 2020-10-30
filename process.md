@@ -896,3 +896,376 @@ func (cli *CLI) PrintChain() {
 
 }
 ```
+
+## 交易结构定义
+``` go 
+package main
+
+type TXInput struct {
+	TXID    []byte //交易id
+	Index   int64  //ouput的索引
+	Address string //解锁脚本，先用地址来模拟
+}
+
+type TXOutput struct {
+	Value   float64 //转账金额
+	Address string  //锁定脚本
+}
+
+type Transaction struct {
+	Txid      []byte     //交易id
+	TXInputs  []TXInput  //所有的inputs
+	TXOutputs []TXOutput //所有的outputs
+}
+
+```
+
+## settxid函数实现
+```go
+
+func (tx *Transaction) SetTXID() {
+
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+
+	err := encoder.Encode(tx)
+
+	if err != nil {
+		log.Panic(err)
+	}
+	hash := sha256.Sum256(buffer.Bytes())
+	tx.Txid = hash[:]
+
+}
+```
+## 挖矿交易实现
+```go
+//实现挖矿交易，
+//特点：只有输出，没有有效的输入（不需要引用id，不需要索引，不需要签名）
+
+//把挖矿的人传递进来，因为有奖励
+func NewCoinbaseTx(miner string) *Transaction {
+	//我们在后面的程序中，需要识别一个交易是否为coinbase，所以设置一些特殊值，用于判断
+	//TODO
+	inputs := []TXInput{TXInput{nil, -1, genesisInfo}}
+	outputs := []TXOutput{TXOutput{12.5, miner}}
+
+	tx := Transaction{nil, inputs, outputs}
+	tx.SetTXID()
+	
+	return &tx
+}
+```
+## 使用Transaction改写程序
+1、改写block结构
+2、根据提示修改：逐个文件处理
+3、使用strings命令查看
+
+## 模拟梅克尔根
+```go
+//比特币做hash，是对区块头做hash
+//模拟梅克尔根，做一个简单的处理
+func (block *Block) HashTransactions() {
+	//交易的id就是交易的哈希值，所以可以将id拼接起来，整体做一个哈希运算，作为Merkleroot
+	var hashes []byte
+	for _, tx := range block.Transactions {
+		txid /*[]byte*/ := tx.Txid
+		hashes = append(hashes, txid...)
+	}
+	hash := sha256.Sum256(hashes)
+	block.MerkleRoot = hash[:]
+
+}
+//在newblock中调用
+```
+
+## 查找余额
+```go
+
+func (bc *BlockChain) FindMyUtxos(address string) []TXOutput {
+	//TODO
+	fmt.Printf("FindMyUtxos\n")
+
+	return []TXOutput{}
+}
+
+func (bc *BlockChain) GetBalance(address string) {
+	utxos := bc.FindMyUtxos(address)
+	var total = 0.0
+	for _, utxo := range utxos {
+		total += utxo.Value
+	}
+	fmt.Printf("%s的余额为：%f\n", address, total)
+}
+```
+在cli中添加getbalance命令，调用getbalance函数
+
+## 遍历交易输出
+```go
+
+func (bc *BlockChain) FindMyUtxos(address string) []TXOutput {
+	//TODO
+	fmt.Printf("FindMyUtxos\n")
+	var UTXOs []TXOutput //返回的结构
+
+	it := bc.NewIterator()
+
+	//1.遍历账本
+	for {
+		block := it.Next()
+
+		//2.遍历交易
+		for _, tx := range block.Transactions {
+
+			//3.遍历output
+			for i, output := range tx.TXOutputs {
+
+				//4.找到所有属于账户的output
+				if address == output.Address {
+					fmt.Printf("找到了属于%s的output，i:%d\n", address, i)
+					UTXOs = append(UTXOs, output)
+				}
+
+			}
+		}
+
+		if len(block.PrevBlockHash) == 0 {
+			fmt.Printf("遍历区块链结束!\n")
+			break
+		}
+	}
+
+	return UTXOs
+}
+```
+## 遍历交易的inputs
+```go
+
+	//1.遍历账本
+	for {
+		block := it.Next()
+
+		//2.遍历交易
+		for _, tx := range block.Transactions {
+			//遍历交易输入：inputs
+			for _, input := range tx.TXInputs {
+				if input.Address == address {
+					fmt.Printf("找到了消耗过的output！index:%d\n", input.Index)
+					key := string(input.TXID)
+					spentUTXOs[key] = append(spentUTXOs[key], input.Index)
+
+				}
+			}
+
+			//3.遍历output
+			for i, output := range tx.TXOutputs {
+
+				//4.找到所有属于账户的output
+				if address == output.Address {
+					fmt.Printf("找到了属于%s的output，i:%d\n", address, i)
+					UTXOs = append(UTXOs, output)
+				}
+
+			}
+		}
+
+		if len(block.PrevBlockHash) == 0 {
+			fmt.Printf("遍历区块链结束!\n")
+			break
+		}
+	}
+```
+
+## 整体遍历过程
+```go
+
+func (bc *BlockChain) FindMyUtxos(address string) []TXOutput {
+	//TODO
+	fmt.Printf("FindMyUtxos\n")
+	var UTXOs []TXOutput //返回的结构
+
+	it := bc.NewIterator()
+
+	//这是标识已经消耗过的utxo结构，key是交易id，value是这个id里面的output索引的数组
+	spentUTXOs := make(map[string][]int64)
+
+	//1.遍历账本
+	for {
+		block := it.Next()
+
+		//2.遍历交易
+		for _, tx := range block.Transactions {
+			//遍历交易输入：inputs
+			for _, input := range tx.TXInputs {
+				if input.Address == address {
+					fmt.Printf("找到了消耗过的output！index:%d\n", input.Index)
+					key := string(input.TXID)
+					spentUTXOs[key] = append(spentUTXOs[key], input.Index)
+
+				}
+			}
+		OUTPUT:
+			//3.遍历output
+			for i, output := range tx.TXOutputs {
+				key := string(tx.Txid)
+				indexs := spentUTXOs[key]
+				if len(indexs) != 0 {
+					fmt.Printf("当前这笔交易中有被消耗过的output！\n")
+					for _, j := range indexs {
+						if int64(i) == j {
+							fmt.Printf("i=j,当前的output已经被消耗过了，跳过不统计")
+							continue OUTPUT
+						}
+
+					}
+
+				}
+
+				//4.找到所有属于账户的output
+				if address == output.Address {
+					fmt.Printf("找到了属于%s的output，i:%d\n", address, i)
+					UTXOs = append(UTXOs, output)
+				}
+
+			}
+		}
+
+		if len(block.PrevBlockHash) == 0 {
+			fmt.Printf("遍历区块链结束!\n")
+			break
+		}
+	}
+
+	return UTXOs
+}
+
+func (bc *BlockChain) GetBalance(address string) {
+	utxos := bc.FindMyUtxos(address)
+	var total = 0.0
+	for _, utxo := range utxos {
+		total += utxo.Value
+	}
+	fmt.Printf("%s的余额为：%f\n", address, total)
+}
+```
+
+## 创建普通交易
+参数：
+1、付款人
+2、收款人
+3、转账金额
+4、bc
+
+内部逻辑：
+遍历账本，找到属于付款人的合适的金额，把这个outputs找到
+如果找到钱不足以转账，创建交易失败
+将outputs转成inputs
+创建输出，创建一个属于收款人的output
+如果有找零，创建属于付款人output
+设置交易id
+返回交易结构
+
+### 代码
+``` go
+
+func NewTransaction(from, to string, amount float64, bc *BlockChain) *Transaction {
+
+	utxos := make(map[string][]int64)
+	var resValue float64
+	//遍历账本，找到属于付款人的合适的金额，把这个outputs找到
+	utxos, resValue = bc.FindNeedUtxos(from, amount)
+
+	//如果找到钱不足以转账，创建交易失败
+	if resValue < amount {
+		fmt.Printf("余额不足，交易失败!\n")
+		return nil
+	}
+
+	var inputs []TXInput
+	var outputs []TXOutput
+
+	//将outputs转成inputs
+	for txid, indexes := range utxos {
+		for _, i := range indexes {
+			input := TXInput{[]byte(txid), i, from}
+			inputs = append(inputs, input)
+
+		}
+	}
+	//创建输出，创建一个属于收款人的output
+	output := TXOutput{amount, to}
+	outputs = append(outputs, output)
+
+	//如果有找零，创建属于付款人output
+	if resValue > amount {
+		output1 := TXOutput{resValue - amount, from}
+		outputs = append(outputs, output1)
+	}
+	//创建交易
+	tx := Transaction{nil, inputs, outputs}
+	//设置交易id
+	tx.SetTXID()
+	//返回交易结构
+	return &tx
+
+}
+```
+#  FindNeedUtxos函数
+```go
+func (bc *BlockChain) FindNeedUtxos(from string, amount float64) (map[string][]int64, float64) {
+	//TODO 找到合理utxos集合
+	utxos := make(map[string][]int64)
+	return utxos, 0.0
+
+}
+```
+
+返回交易结构
+
+## 添加send命令
+
+```go
+case "send":
+		fmt.Printf("转账命令被调用\n")
+		//./blockchain send FROM TO AMOUNT MINER DATA	转账
+		if len(cmds) != 7 {
+			fmt.Printf("send命令发现无效参数，请检查\n")
+			fmt.Printf(Usage)
+			os.Exit(1)
+		}
+		from := cmds[2]
+		to := cmds[3]
+		amount, _ := strconv.ParseFloat(cmds[4], 64)
+		miner := cmds[5]
+		data := cmds[6]
+		cli.Send(from, to, amount, miner, data)
+```
+
+## Send命令实现
+``` go
+
+func (cli *CLI) Send(from string, to string, amount float64, miner string, data string) {
+	//创建挖矿交易
+	//创建普通交易
+	//添加到区块
+
+	//1.创建挖矿者
+	coinbase := NewCoinbaseTx(miner, data)
+
+	//2.创建普通交易
+	tx := NewTransaction(from, to, amount, cli.bc)
+
+	txs := []*Transaction{coinbase}
+
+	if tx != nil {
+		txs = append(txs, tx)
+	} else {
+		fmt.Printf("发现无效交易，过滤!\n")
+	}
+
+	//3.添加到区块
+	cli.bc.AddBlock(txs)
+
+	fmt.Printf("挖矿成功!\n")
+}
+```
