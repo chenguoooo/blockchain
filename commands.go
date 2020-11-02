@@ -47,7 +47,7 @@ func (cli *CLI) PrintChain() {
 		fmt.Printf("Difficulity:%d\n", block.Difficulity)
 		fmt.Printf("Nonce:%d\n", block.Nonce)
 		fmt.Printf("Hash:%x\n", block.Hash)
-		fmt.Printf("Data:%s\n", block.Transactions[0].TXInputs[0].Address)
+		fmt.Printf("Data:%s\n", block.Transactions[0].TXInputs[0].Pubkey)
 
 		pow := NewProofOfWork(block)
 		fmt.Printf("Isvalid:%v\n", pow.IsValid())
@@ -98,6 +98,6 @@ func (cli *CLI) ListAddresses() {
 
 	addresses := ws.ListAddress()
 	for _, address := range addresses {
-		fmt.Printf("address:%s\n", address)
+		fmt.Printf("address : %s\n", address)
 	}
 }

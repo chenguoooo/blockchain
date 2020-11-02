@@ -1,6 +1,7 @@
 package main
 
 import (
+	"base58"
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
@@ -20,6 +21,20 @@ type TXOutput struct {
 	Value float64 //转账金额
 	//Address string  //锁定脚本
 	PubKeyHash []byte //公钥哈希，不是公钥本身
+}
+
+//给定转账地址，得到这个地址的公钥哈希，完成对output的锁定
+func (output *TXOutput) Lock(address string) {
+	//address ->public key hash
+	decodeInfo, _ := base58.Decode(address)
+	pubKeyHash := decodeInfo[1 : len(decodeInfo)-4]
+	output.PubKeyHash = pubKeyHash
+}
+
+func NewTXOutput(value float64, address string) TXOutput {
+	output := TXOutput{Value: value}
+	output.Lock(address)
+	return output
 }
 
 type Transaction struct {
@@ -46,11 +61,17 @@ func (tx *Transaction) SetTXID() {
 //实现挖矿交易，
 //特点：只有输出，没有有效的输入（不需要引用id，不需要索引，不需要签名）
 
+//挖矿奖励
+const reward = 12.5
+
 //把挖矿的人传递进来，因为有奖励
 func NewCoinbaseTx(miner string, data string) *Transaction {
 
-	inputs := []TXInput{TXInput{nil, -1, data}}
-	outputs := []TXOutput{TXOutput{12.5, miner}}
+	inputs := []TXInput{TXInput{nil, -1, nil, []byte(data)}}
+	//outputs := []TXOutput{TXOutput{12.5, miner}}
+
+	output := NewTXOutput(reward, miner)
+	outputs := []TXOutput{output}
 
 	tx := Transaction{nil, inputs, outputs}
 	tx.SetTXID()
@@ -72,11 +93,26 @@ func (tx *Transaction) IsCoinbase() bool {
 //内部逻辑：
 
 func NewTransaction(from, to string, amount float64, bc *BlockChain) *Transaction {
+	//1.打开钱包
+	ws := NewWallets()
+
+	wallet := ws.WalletsMap[from]
+
+	if wallet == nil {
+		fmt.Printf("%s的私钥不存在，交易创建失败!\n")
+		return nil
+	}
+
+	//2.获取公钥私钥
+	//privateKey:=wallet.PrivateKey //目前用不到，步骤三签名时使用
+	publicKey := wallet.PublicKey
+
+	publicKeyHash := HashPubKey(publicKey)
 
 	utxos := make(map[string][]int64)
 	var resValue float64
 	//遍历账本，找到属于付款人的合适的金额，把这个outputs找到
-	utxos, resValue = bc.FindNeedUtxos(from, amount)
+	utxos, resValue = bc.FindNeedUtxos(publicKeyHash, amount)
 
 	//如果找到钱不足以转账，创建交易失败
 	if resValue < amount {
@@ -90,18 +126,20 @@ func NewTransaction(from, to string, amount float64, bc *BlockChain) *Transactio
 	//将outputs转成inputs
 	for txid, indexes := range utxos {
 		for _, i := range indexes {
-			input := TXInput{[]byte(txid), i, from}
+			input := TXInput{[]byte(txid), i, nil, publicKey}
 			inputs = append(inputs, input)
 
 		}
 	}
 	//创建输出，创建一个属于收款人的output
-	output := TXOutput{amount, to}
+	//output := TXOutput{amount, to}
+	output := NewTXOutput(amount, to)
 	outputs = append(outputs, output)
 
 	//如果有找零，创建属于付款人output
 	if resValue > amount {
-		output1 := TXOutput{resValue - amount, from}
+		//output1 := TXOutput{resValue - amount, from}
+		output1 := NewTXOutput(resValue-amount, from)
 		outputs = append(outputs, output1)
 	}
 	//创建交易

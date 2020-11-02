@@ -1,7 +1,9 @@
 package main
 
 import (
+	"base58"
 	"bolt"
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -178,7 +180,7 @@ type UTXOInfo struct {
 	Output TXOutput //output本身
 }
 
-func (bc *BlockChain) FindMyUtxos(address string) []UTXOInfo {
+func (bc *BlockChain) FindMyUtxos(pubKeyHash []byte) []UTXOInfo {
 
 	fmt.Printf("FindMyUtxos\n")
 	//var UTXOs []TXOutput //
@@ -200,7 +202,8 @@ func (bc *BlockChain) FindMyUtxos(address string) []UTXOInfo {
 			if tx.IsCoinbase() == false {
 				//如果不是coinbase，说明是普通交易，才有必要进行遍历
 				for _, input := range tx.TXInputs {
-					if input.Address == address {
+					//判断当前使用的input是否为目标地址所有
+					if bytes.Equal(HashPubKey(input.Pubkey), pubKeyHash) {
 						fmt.Printf("找到了消耗过的output！index:%d\n", input.Index)
 						key := string(input.TXID)
 						spentUTXOs[key] = append(spentUTXOs[key], input.Index)
@@ -226,8 +229,8 @@ func (bc *BlockChain) FindMyUtxos(address string) []UTXOInfo {
 				}
 
 				//4.找到所有属于账户的output
-				if address == output.Address {
-					fmt.Printf("找到了属于%s的output，i:%d\n", address, i)
+				if bytes.Equal(pubKeyHash, output.PubKeyHash) {
+					//fmt.Printf("找到了属于%s的output，i:%d\n", address, i)
 					//UTXOs = append(UTXOs, output)
 					utxoinfo := UTXOInfo{tx.Txid, int64(i), output}
 					UTXOInfos = append(UTXOInfos, utxoinfo)
@@ -246,7 +249,10 @@ func (bc *BlockChain) FindMyUtxos(address string) []UTXOInfo {
 }
 
 func (bc *BlockChain) GetBalance(address string) {
-	utxoinfos := bc.FindMyUtxos(address)
+	decodeInfo, _ := base58.Decode(address)
+	pubKeyHash := decodeInfo[1 : len(decodeInfo)-4]
+
+	utxoinfos := bc.FindMyUtxos(pubKeyHash)
 
 	var total = 0.0
 	//所有的output都在utxoinfos内部
@@ -261,13 +267,13 @@ func (bc *BlockChain) GetBalance(address string) {
 //遍历账本，找到属于付款人的合适的金额，把这个outputs找到
 //utxos, resValue = bc.FindNeedUtxos(from, amount)
 
-func (bc *BlockChain) FindNeedUtxos(from string, amount float64) (map[string][]int64, float64) {
+func (bc *BlockChain) FindNeedUtxos(pubKeyHash []byte, amount float64) (map[string][]int64, float64) {
 
 	needUtxos := make(map[string][]int64)
 	var resValue float64 //统计的金额
 
 	//复用Findmyutxo函数，这个函数已经包含所有信息
-	utxoinfos := bc.FindMyUtxos(from)
+	utxoinfos := bc.FindMyUtxos(pubKeyHash)
 	for _, utxoinfo := range utxoinfos {
 		key := string(utxoinfo.TXID)
 		needUtxos[key] = append(needUtxos[key], int64(utxoinfo.Index))
