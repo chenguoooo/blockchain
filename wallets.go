@@ -110,3 +110,12 @@ func (ws *Wallets) LoadFromFile() bool {
 	return true
 
 }
+
+func (ws *Wallets) ListAddress() []string {
+	//遍历ws.WalletsMap结构返回key即可
+	var addresses []string
+	for address, _ := range ws.WalletsMap {
+		addresses = append(addresses, address)
+	}
+	return addresses
+}

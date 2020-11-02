@@ -92,3 +92,12 @@ func (cli *CLI) CreateWallet() {
 
 	fmt.Printf("新的钱包地址为：%s\n", address)
 }
+
+func (cli *CLI) ListAddresses() {
+	ws := NewWallets()
+
+	addresses := ws.ListAddress()
+	for _, address := range addresses {
+		fmt.Printf("address:%s\n", address)
+	}
+}

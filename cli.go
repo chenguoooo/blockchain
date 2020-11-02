@@ -11,7 +11,9 @@ const Usage = `
 	./blockchain printChain				"打印区块链"
 	./blockchain getBalance	地址			"获取地址的余额"
 	./blockchain send FROM TO AMOUNT MINER DATA	"转账命令"
-	./blockchain createWallet	"创建钱包"
+	./blockchain createWallet			"创建钱包"
+	./blockchain ListAddresses			"打印钱包地址"
+
 `
 
 type CLI struct {
@@ -63,7 +65,9 @@ func (cli *CLI) Run() {
 	case "createWallet":
 		fmt.Printf("创建钱包命令被调用\n")
 		cli.CreateWallet()
-
+	case "ListAddresses":
+		fmt.Printf("打印钱包地址命令被调用\n")
+		cli.ListAddresses()
 	default:
 		fmt.Printf("无效命令，请检查\n")
 		fmt.Printf(Usage)
