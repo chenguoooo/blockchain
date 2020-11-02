@@ -84,3 +84,11 @@ func (cli *CLI) Send(from string, to string, amount float64, miner string, data 
 
 	fmt.Printf("挖矿成功!\n")
 }
+
+func (cli *CLI) CreateWallet() {
+
+	ws := NewWallets()
+	address := ws.CreateWallet()
+
+	fmt.Printf("新的钱包地址为：%s\n", address)
+}

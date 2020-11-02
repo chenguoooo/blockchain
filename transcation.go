@@ -45,8 +45,7 @@ func (tx *Transaction) SetTXID() {
 
 //把挖矿的人传递进来，因为有奖励
 func NewCoinbaseTx(miner string, data string) *Transaction {
-	//我们在后面的程序中，需要识别一个交易是否为coinbase，所以设置一些特殊值，用于判断
-	//TODO
+
 	inputs := []TXInput{TXInput{nil, -1, data}}
 	outputs := []TXOutput{TXOutput{12.5, miner}}
 
