@@ -4,6 +4,7 @@ import (
 	"base58"
 	"bolt"
 	"bytes"
+	"crypto/ecdsa"
 	"fmt"
 	"log"
 	"os"
@@ -286,4 +287,70 @@ func (bc *BlockChain) FindNeedUtxos(pubKeyHash []byte, amount float64) (map[stri
 
 	}
 	return needUtxos, resValue
+}
+
+func (bc *BlockChain) SignTranscation(tx *Transaction, privateKey *ecdsa.PrivateKey) {
+	//1.遍历账本找到所有引用交易
+	prevTXs := make(map[string]Transaction)
+
+	//遍历tx的inputs，通过id去查找所引用的交易
+	for _, input := range tx.TXInputs {
+		prevTx := bc.FindTransaction(input.TXID)
+
+		if prevTx == nil {
+			fmt.Printf("没有找到交易：%x\n", input.TXID)
+		} else {
+			//把找到的引用交易保存起来
+			prevTXs[string(input.TXID)] = *prevTx
+		}
+
+	}
+
+	tx.Sign(privateKey, prevTXs)
+
+}
+
+//矿工校验过程
+//1.找到交易input所引用的交易prevTXs
+//2.对交易进行校验
+
+func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
+	prevTXs := make(map[string]Transaction)
+
+	//遍历tx的inputs，通过id去查找所引用的交易
+	for _, input := range tx.TXInputs {
+		prevTx := bc.FindTransaction(input.TXID)
+
+		if prevTx == nil {
+			fmt.Printf("没有找到交易：%x\n", input.TXID)
+		} else {
+			//把找到的引用交易保存起来
+			prevTXs[string(input.TXID)] = *prevTx
+		}
+
+	}
+
+	return tx.Verify(prevTXs)
+
+}
+
+func (bc *BlockChain) FindTransaction(txid []byte) *Transaction {
+	//遍历区块链的交易
+	//通过对比id来识别
+
+	it := bc.NewIterator()
+	for {
+		block := it.Next()
+
+		for _, tx := range block.Transactions {
+			if bytes.Equal(tx.Txid, txid) {
+				fmt.Printf("找到了所引用的交易，id:%x\n", tx.Txid)
+				return tx
+			}
+		}
+		if len(block.PrevBlockHash) == 0 {
+			break
+		}
+	}
+	return nil
 }

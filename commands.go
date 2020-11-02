@@ -8,6 +8,11 @@ import (
 
 //实现具体的命令
 func (cli *CLI) CreatBlockChain(addr string) {
+	if !IsValidAddress(addr) {
+		fmt.Printf("%s是无效地址！\n", addr)
+		return
+	}
+
 	bc := CreatBlockChain(addr)
 	if bc != nil {
 		defer bc.db.Close()
@@ -17,6 +22,11 @@ func (cli *CLI) CreatBlockChain(addr string) {
 }
 
 func (cli *CLI) GetBalance(addr string) {
+	if !IsValidAddress(addr) {
+		fmt.Printf("%s是无效地址！\n", addr)
+		return
+	}
+
 	bc := NewBlockChain()
 	if bc == nil {
 		return
@@ -61,6 +71,19 @@ func (cli *CLI) PrintChain() {
 }
 
 func (cli *CLI) Send(from string, to string, amount float64, miner string, data string) {
+	if !IsValidAddress(from) {
+		fmt.Printf("from:%s是无效地址！\n", from)
+		return
+	}
+	if !IsValidAddress(to) {
+		fmt.Printf("to:%s是无效地址！\n", to)
+		return
+	}
+	if !IsValidAddress(miner) {
+		fmt.Printf("miner:%s是无效地址！\n", miner)
+		return
+	}
+
 	bc := NewBlockChain()
 	if bc == nil {
 		return

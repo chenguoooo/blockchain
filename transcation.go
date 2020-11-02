@@ -3,6 +3,7 @@ package main
 import (
 	"base58"
 	"bytes"
+	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
@@ -104,7 +105,7 @@ func NewTransaction(from, to string, amount float64, bc *BlockChain) *Transactio
 	}
 
 	//2.获取公钥私钥
-	//privateKey:=wallet.PrivateKey //目前用不到，步骤三签名时使用
+	privateKey := wallet.PrivateKey //目前用不到，步骤三签名时使用
 	publicKey := wallet.PublicKey
 
 	publicKeyHash := HashPubKey(publicKey)
@@ -146,7 +147,30 @@ func NewTransaction(from, to string, amount float64, bc *BlockChain) *Transactio
 	tx := Transaction{nil, inputs, outputs}
 	//设置交易id
 	tx.SetTXID()
+	//把查找引用交易的环节放到Blockchain中去，同时在BlockChain进行调用签名
+
+	//付款人在创建交易时，已经得到了所有引用的output的详细信息
+	//但是不使用，因为矿工校验的时候，矿工没有这部分信息，矿工需要遍历账本找到所有引用交易
+	//为了统一操作，所以再次查询，进行签名
+
+	bc.SignTranscation(&tx, privateKey)
+
 	//返回交易结构
 	return &tx
+
+}
+
+//第一个参数是私钥
+//第二个参数是这个交易的input所引用的所有交易
+func (tx *Transaction) Sign(privkey *ecdsa.PrivateKey, prevTXs map[string]Transaction) {
+	fmt.Printf("对交易进行签名...\n")
+
+	//TODO
+}
+func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
+	fmt.Printf("对交易进行校验...\n")
+
+	//TODO
+	return true
 
 }
