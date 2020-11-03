@@ -88,7 +88,7 @@ func (cli *CLI) Send(from string, to string, amount float64, miner string, data 
 	if bc == nil {
 		return
 	}
-	//1.创建挖矿者
+	//1.创建挖矿交易
 	coinbase := NewCoinbaseTx(miner, data)
 
 	//2.创建普通交易
@@ -123,4 +123,27 @@ func (cli *CLI) ListAddresses() {
 	for _, address := range addresses {
 		fmt.Printf("address : %s\n", address)
 	}
+}
+
+func (cli *CLI) PrintTx() {
+	bc := NewBlockChain()
+	if bc == nil {
+		return
+	}
+
+	it := bc.NewIterator()
+
+	for {
+		block := it.Next()
+		fmt.Printf("\n+++++++++++++++新的区块+++++++++++++++++++\n")
+		for _, tx := range block.Transactions {
+			fmt.Printf("tx:%v\n", tx)
+		}
+
+		if len(block.PrevBlockHash) == 0 {
+			break
+		}
+
+	}
+
 }

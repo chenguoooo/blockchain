@@ -4,10 +4,14 @@ import (
 	"base58"
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
 	"log"
+	"math/big"
+	"strings"
 )
 
 type TXInput struct {
@@ -165,12 +169,151 @@ func NewTransaction(from, to string, amount float64, bc *BlockChain) *Transactio
 func (tx *Transaction) Sign(privkey *ecdsa.PrivateKey, prevTXs map[string]Transaction) {
 	fmt.Printf("对交易进行签名...\n")
 
-	//TODO
+	//校验的时候，如果是挖矿交易，直接返回true
+	if tx.IsCoinbase() {
+		fmt.Printf("是挖矿交易\n")
+		return
+	}
+
+	//1.拷贝一份交易txCopy
+	txCopy := tx.TrimmedCopy()
+
+	//2.遍历txCopy.inputs，
+	//>>把这个input所引用的output的公钥哈希拿过来，赋值给pubkey
+	for i, input := range txCopy.TXInputs {
+		//找到引用交易
+		prevTX := prevTXs[string(input.TXID)]
+		output := prevTX.TXOutputs[input.Index]
+
+		//for循环迭代器迭代出来的数据是一个副本，对这个input进行修改，不会影响到原始数据
+		//input.Pubkey = output.PubKeyHash
+		txCopy.TXInputs[i].Pubkey = output.PubKeyHash
+
+		//签名要对数据的hash进行签名
+		//数据都在交易中，要求交易的哈希
+		//Transaction的SetTXID函数就是对交易的哈希
+		//可以使用交易id作为签名的内容
+
+		//3.生成要签名的数据
+		txCopy.SetTXID()
+		signData := txCopy.Txid
+
+		//清理
+		//input.Pubkey = nil
+		txCopy.TXInputs[i].Pubkey = nil
+
+		fmt.Printf("要签名的数据，signData：%x\n", signData)
+
+		//4.对数据进行签名r，s
+		r, s, err := ecdsa.Sign(rand.Reader, privkey, signData)
+		if err != nil {
+			fmt.Printf("交易签名失败，err：%v\n", err)
+			//return false
+		}
+
+		//5.拼接r，s为字节流，
+		signature := append(r.Bytes(), s.Bytes()...)
+		//赋值给原始的交易的Signature字段
+		tx.TXInputs[i].Signature = signature
+
+	}
+	//return true
+
 }
+
+//trim:裁剪
+//>>做相应的裁剪：把每一个input的Sig和pubKey设置为nil
+//>>output不做改变
+
+func (tx *Transaction) TrimmedCopy() Transaction {
+	var inputs []TXInput
+	var outputs []TXOutput
+
+	for _, input := range tx.TXInputs {
+		input1 := TXInput{input.TXID, input.Index, nil, nil}
+		inputs = append(inputs, input1)
+	}
+
+	outputs = tx.TXOutputs
+
+	tx1 := Transaction{tx.Txid, inputs, outputs}
+	return tx1
+
+}
+
 func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 	fmt.Printf("对交易进行校验...\n")
 
-	//TODO
+	//1.拷贝修剪的副本
+	txCopy := tx.TrimmedCopy()
+	//2.遍历原始交易
+	for i, input := range tx.TXInputs {
+		//3.遍历原始交易的input所引用的前交易prevTX
+		prevTX := prevTXs[string(input.TXID)]
+		//4.找到output的公钥哈希，赋值给txCopy对应的input
+		//txCopy.TXInputs[i].Pubkey = output.PubKeyHash
+
+		output := prevTX.TXOutputs[input.Index]
+
+		txCopy.TXInputs[i].Pubkey = output.PubKeyHash
+
+		//5.还原签名的数据
+		txCopy.SetTXID()
+		verifyData := txCopy.Txid
+		fmt.Printf("verifyData:%x\n", verifyData)
+		//6.校验
+		//还原签名为r，s
+		signature := input.Signature
+
+		//公钥字节流
+		pubKeyBytes := input.Pubkey
+
+		r := big.Int{}
+		s := big.Int{}
+		rData := signature[:len(signature)/2]
+		sData := signature[len(signature)/2:]
+		r.SetBytes(rData)
+		s.SetBytes(sData)
+
+		//还原公钥为curve，X，Y
+		x := big.Int{}
+		y := big.Int{}
+		xData := pubKeyBytes[:len(signature)/2]
+		yData := pubKeyBytes[len(signature)/2:]
+		x.SetBytes(xData)
+		y.SetBytes(yData)
+
+		curve := elliptic.P256()
+		publicKey := ecdsa.PublicKey{curve, &x, &y}
+
+		//数据、签名、公钥准备完毕，开始校验
+		if !ecdsa.Verify(&publicKey, verifyData, &r, &s) {
+			return false
+		}
+	}
+
 	return true
+
+}
+func (tx *Transaction) String() string {
+	var lines []string
+
+	lines = append(lines, fmt.Sprintf("--- Transaction %x:", tx.Txid))
+
+	for i, input := range tx.TXInputs {
+		lines = append(lines, fmt.Sprintf("Input%d:", i))
+		lines = append(lines, fmt.Sprintf("Txid:%x", input.TXID))
+		lines = append(lines, fmt.Sprintf("Out:%d", input.Index))
+		lines = append(lines, fmt.Sprintf("Signature:%x", input.Signature))
+		lines = append(lines, fmt.Sprintf("PubKey:%x", input.Pubkey))
+
+	}
+	for i, output := range tx.TXOutputs {
+		lines = append(lines, fmt.Sprintf("Output %d:", i))
+		lines = append(lines, fmt.Sprintf("Value:%f", output.Value))
+		lines = append(lines, fmt.Sprintf("Script:%x", output.PubKeyHash))
+
+	}
+	return strings.Join(lines, "\n")
 
 }

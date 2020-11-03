@@ -112,6 +112,20 @@ func NewBlockChain() *BlockChain {
 
 //添加区块
 func (bc *BlockChain) AddBlock(txs []*Transaction) {
+	//矿工得到交易时，第一时间对交易进行验证
+	//矿工如果不验证，即使挖矿成功，广播区块后，其他的验证矿工，仍然会校验每一笔交易
+
+	validTXs := []*Transaction{}
+	for _, tx := range txs {
+
+		if bc.VerifyTransaction(tx) {
+			fmt.Printf("---该交易有效：%x\n", tx.Txid)
+			validTXs = append(validTXs, tx)
+		} else {
+			fmt.Printf("发现无效的交易：%x\n", tx.Txid)
+		}
+	}
+
 	//创建一个区块
 	bc.db.Update(func(tx *bolt.Tx) error {
 
@@ -123,7 +137,7 @@ func (bc *BlockChain) AddBlock(txs []*Transaction) {
 			os.Exit(1)
 		}
 
-		block := NewBlock(txs, bc.tail)
+		block := NewBlock(validTXs, bc.tail)
 		b.Put(block.Hash, block.Serialize() /*将区块序列化，转成字节流*/)
 		b.Put([]byte(lastHashKey), block.Hash)
 
@@ -315,6 +329,12 @@ func (bc *BlockChain) SignTranscation(tx *Transaction, privateKey *ecdsa.Private
 //2.对交易进行校验
 
 func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
+
+	//校验的时候，如果是挖矿交易，直接返回true
+	if tx.IsCoinbase() {
+		return true
+	}
+
 	prevTXs := make(map[string]Transaction)
 
 	//遍历tx的inputs，通过id去查找所引用的交易
