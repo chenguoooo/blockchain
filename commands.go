@@ -70,7 +70,7 @@ func (cli *CLI) PrintChain() {
 
 }
 
-func (cli *CLI) Send(from string, to string, amount float64, miner string, data string) {
+func (cli *CLI) Send(from string, to string, amount float64) (tx *Transaction) {
 	if !IsValidAddress(from) {
 		fmt.Printf("from:%s是无效地址！\n", from)
 		return
@@ -79,32 +79,35 @@ func (cli *CLI) Send(from string, to string, amount float64, miner string, data 
 		fmt.Printf("to:%s是无效地址！\n", to)
 		return
 	}
-	if !IsValidAddress(miner) {
-		fmt.Printf("miner:%s是无效地址！\n", miner)
-		return
-	}
 
 	bc := NewBlockChain()
 	if bc == nil {
 		return
 	}
-	//1.创建挖矿交易
-	coinbase := NewCoinbaseTx(miner, data)
-
-	//2.创建普通交易
-	tx := NewTransaction(from, to, amount, bc)
-
-	txs := []*Transaction{coinbase}
-
+	//创建普通交易
+	tx = NewTransaction(from, to, amount, bc)
 	if tx != nil {
-		txs = append(txs, tx)
+		fmt.Printf("创建交易成功!\n")
+		return tx
 	} else {
 		fmt.Printf("发现无效交易，过滤!\n")
 	}
+	return
+}
 
-	//3.添加到区块
+func (cli *CLI) AddBlock(miner string, data string, txs []*Transaction) {
+	if !IsValidAddress(miner) {
+		fmt.Printf("miner:%s是无效地址！\n", miner)
+		return
+	}
+	bc := NewBlockChain()
+	if bc == nil {
+		return
+	}
+	coinbase := NewCoinbaseTx(miner, data)
+	txs = append(txs, coinbase)
+
 	bc.AddBlock(txs)
-
 	fmt.Printf("挖矿成功!\n")
 }
 

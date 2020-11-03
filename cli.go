@@ -10,10 +10,11 @@ const Usage = `
 	./blockchain CreatBlockChain 地址		"创建区块链"
 	./blockchain printChain				"打印区块链"
 	./blockchain getBalance	地址			"获取地址的余额"
-	./blockchain send FROM TO AMOUNT MINER DATA	"转账命令"
+	./blockchain send FROM TO AMOUNT 		"转账命令"
 	./blockchain createWallet			"创建钱包"
 	./blockchain ListAddresses			"打印钱包地址"
-	./blockchain printTx			"打印交易"
+	./blockchain printTx				"打印交易"
+	./blockchain addBlock Miner Data		"添加区块"
 
 `
 
@@ -24,8 +25,8 @@ type CLI struct {
 
 //给CLI提供一个方法，进行命令解析，从而执行调度
 func (cli *CLI) Run() {
-	cmds := os.Args
 
+	cmds := os.Args
 	if len(cmds) < 2 {
 		fmt.Printf(Usage)
 		os.Exit(1)
@@ -51,8 +52,8 @@ func (cli *CLI) Run() {
 
 	case "send":
 		fmt.Printf("转账命令被调用\n")
-		//./blockchain send FROM TO AMOUNT MINER DATA	转账
-		if len(cmds) != 7 {
+		//./blockchain send FROM TO AMOUNT 	转账
+		if len(cmds) != 5 {
 			fmt.Printf("send命令发现无效参数，请检查\n")
 			fmt.Printf(Usage)
 			os.Exit(1)
@@ -60,9 +61,10 @@ func (cli *CLI) Run() {
 		from := cmds[2]
 		to := cmds[3]
 		amount, _ := strconv.ParseFloat(cmds[4], 64)
-		miner := cmds[5]
-		data := cmds[6]
-		cli.Send(from, to, amount, miner, data)
+		tx := cli.Send(from, to, amount)
+		txs := NewTransactions()
+		txs.CreateTransaction(tx)
+
 	case "createWallet":
 		fmt.Printf("创建钱包命令被调用\n")
 		cli.CreateWallet()
@@ -72,6 +74,20 @@ func (cli *CLI) Run() {
 	case "printTx":
 		fmt.Printf("打印交易命令被调用\n")
 		cli.PrintTx()
+	case "addBlock":
+		//func (cli *CLI) AddBlock(miner string, data string,txs []*Transaction){
+		miner := cmds[2]
+		data := cmds[3]
+		fmt.Printf("挖矿交易命令被调用\n")
+		txs := NewTransactions()
+		txs1 := []*Transaction{}
+		for _, tx := range txs.TransactionsMap {
+			txs1 = append(txs1, tx)
+		}
+		cli.AddBlock(miner, data, txs1) //要改
+		txs.ClearFile()
+
+		//TODO
 	default:
 		fmt.Printf("无效命令，请检查\n")
 		fmt.Printf(Usage)

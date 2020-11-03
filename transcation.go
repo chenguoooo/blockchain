@@ -14,6 +14,12 @@ import (
 	"strings"
 )
 
+type Transaction struct {
+	Txid      []byte     //交易id
+	TXInputs  []TXInput  //所有的inputs
+	TXOutputs []TXOutput //所有的outputs
+}
+
 type TXInput struct {
 	TXID  []byte //交易id
 	Index int64  //ouput的索引
@@ -40,12 +46,6 @@ func NewTXOutput(value float64, address string) TXOutput {
 	output := TXOutput{Value: value}
 	output.Lock(address)
 	return output
-}
-
-type Transaction struct {
-	Txid      []byte     //交易id
-	TXInputs  []TXInput  //所有的inputs
-	TXOutputs []TXOutput //所有的outputs
 }
 
 func (tx *Transaction) SetTXID() {
