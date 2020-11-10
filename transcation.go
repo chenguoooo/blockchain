@@ -45,6 +45,7 @@ func (output *TXOutput) Lock(address string) {
 func NewTXOutput(value float64, address string) TXOutput {
 	output := TXOutput{Value: value}
 	output.Lock(address)
+
 	return output
 }
 
@@ -97,9 +98,9 @@ func (tx *Transaction) IsCoinbase() bool {
 
 //内部逻辑：
 
-func NewTransaction(from, to string, amount float64, bc *BlockChain) *Transaction {
-	//1.打开钱包
-	ws := NewWallets()
+func NewTransaction(from, to string, amount float64, bc *BlockChain, ws *Wallets) *Transaction {
+	////1.打开钱包
+	//ws := NewWallets()
 
 	wallet := ws.WalletsMap[from]
 
@@ -121,7 +122,7 @@ func NewTransaction(from, to string, amount float64, bc *BlockChain) *Transactio
 
 	//如果找到钱不足以转账，创建交易失败
 	if resValue < amount {
-		fmt.Printf("余额不足，交易失败!\n")
+		//fmt.Printf("余额不足，交易失败!\n")
 		return nil
 	}
 
@@ -167,7 +168,7 @@ func NewTransaction(from, to string, amount float64, bc *BlockChain) *Transactio
 //第一个参数是私钥
 //第二个参数是这个交易的input所引用的所有交易
 func (tx *Transaction) Sign(privkey *ecdsa.PrivateKey, prevTXs map[string]Transaction) {
-	fmt.Printf("对交易进行签名...\n")
+	//fmt.Printf("对交易进行签名...\n")
 
 	//校验的时候，如果是挖矿交易，直接返回true
 	if tx.IsCoinbase() {
@@ -202,7 +203,7 @@ func (tx *Transaction) Sign(privkey *ecdsa.PrivateKey, prevTXs map[string]Transa
 		//input.Pubkey = nil
 		txCopy.TXInputs[i].Pubkey = nil
 
-		fmt.Printf("要签名的数据，signData：%x\n", signData)
+		//fmt.Printf("要签名的数据，signData：%x\n", signData)
 
 		//4.对数据进行签名r，s
 		r, s, err := ecdsa.Sign(rand.Reader, privkey, signData)
@@ -242,14 +243,16 @@ func (tx *Transaction) TrimmedCopy() Transaction {
 }
 
 func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
-	fmt.Printf("对交易进行校验...\n")
+	//fmt.Printf("对交易进行校验...\n")
 
 	//1.拷贝修剪的副本
 	txCopy := tx.TrimmedCopy()
 	//2.遍历原始交易
 	for i, input := range tx.TXInputs {
+
 		//3.遍历原始交易的input所引用的前交易prevTX
 		prevTX := prevTXs[string(input.TXID)]
+
 		//4.找到output的公钥哈希，赋值给txCopy对应的input
 		//txCopy.TXInputs[i].Pubkey = output.PubKeyHash
 
@@ -260,7 +263,7 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 		//5.还原签名的数据
 		txCopy.SetTXID()
 		verifyData := txCopy.Txid
-		fmt.Printf("verifyData:%x\n", verifyData)
+		//fmt.Printf("verifyData:%x\n", verifyData)
 		//6.校验
 		//还原签名为r，s
 		signature := input.Signature
@@ -290,6 +293,7 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 		if !ecdsa.Verify(&publicKey, verifyData, &r, &s) {
 			return false
 		}
+
 	}
 
 	return true
@@ -298,12 +302,12 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 func (tx *Transaction) String() string {
 	var lines []string
 
-	lines = append(lines, fmt.Sprintf("--- Transaction %x:", tx.Txid))
+	lines = append(lines, fmt.Sprintf("\nTxid:%x", tx.Txid))
 
 	for i, input := range tx.TXInputs {
-		lines = append(lines, fmt.Sprintf("Input%d:", i))
-		lines = append(lines, fmt.Sprintf("Txid:%x", input.TXID))
-		lines = append(lines, fmt.Sprintf("Out:%d", input.Index))
+		lines = append(lines, fmt.Sprintf("Input %d:", i))
+		lines = append(lines, fmt.Sprintf("InputId:%x", input.TXID))
+		lines = append(lines, fmt.Sprintf("InputIndex:%d", input.Index))
 		lines = append(lines, fmt.Sprintf("Signature:%x", input.Signature))
 		lines = append(lines, fmt.Sprintf("PubKey:%x", input.Pubkey))
 

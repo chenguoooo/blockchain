@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
+	"os"
 )
 
 type Transactions struct {
@@ -24,6 +25,9 @@ func NewTransactions() *Transactions {
 }
 
 func (txs *Transactions) CreateTransaction(tx *Transaction) {
+	if tx == nil {
+		return
+	}
 	txs.TransactionsMap[string(tx.Txid)] = tx
 	res := txs.SaveToFile()
 	if !res {
@@ -61,7 +65,7 @@ func (txs *Transactions) SaveToFile() bool {
 func (txs *Transactions) LoadFromFile() bool {
 	//判断文件是否存在
 	if !IsFileExist(TransactionName) {
-		fmt.Printf("交易文件不存在，准备创建！\n")
+		//fmt.Printf("交易文件不存在，准备创建！\n")
 		return true
 	}
 	//读取文件
@@ -86,7 +90,7 @@ func (txs *Transactions) LoadFromFile() bool {
 
 }
 func (txs *Transactions) ClearFile() {
-	err := ioutil.WriteFile(TransactionName, nil, 0600)
+	err := os.Remove(TransactionName)
 	if err != nil {
 		fmt.Printf("清空文件出错")
 	}

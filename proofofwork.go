@@ -16,7 +16,7 @@ type ProofOfWork struct {
 	target *big.Int //系统提供的，是固定的
 }
 
-const Bits = 16
+const Bits = 4
 
 func NewProofOfWork(block *Block) *ProofOfWork {
 	pow := ProofOfWork{
@@ -68,7 +68,7 @@ func (pow *ProofOfWork) Run() ([]byte, uint64) {
 
 	for {
 
-		fmt.Printf("%x\r", hash)
+		//fmt.Printf("%x\r", hash)
 
 		hash = sha256.Sum256(pow.prepareData(nonce))
 
@@ -81,7 +81,7 @@ func (pow *ProofOfWork) Run() ([]byte, uint64) {
 		//   +1 if x >  y
 		if bigIntTmp.Cmp(pow.target) == -1 {
 			//此时x<y,挖矿成功
-			fmt.Printf("挖矿成功！nonce：%d,哈希值为：%x\n\n", nonce, hash)
+			fmt.Printf("挖矿成功！nonce：%d,哈希值为：%x\n", nonce, hash)
 			break
 		} else {
 			nonce++
