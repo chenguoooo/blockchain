@@ -1,10 +1,15 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
 
 func main() {
-	a := 1
-	var b int64
-	b = int64(a)
-	fmt.Println(b)
+	rand.Seed(time.Now().Unix())
+
+	for i := 0; i < 100; i++ {
+		fmt.Printf("%v ", rand.Intn(1))
+	}
 }

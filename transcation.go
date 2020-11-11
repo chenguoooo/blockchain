@@ -98,7 +98,7 @@ func (tx *Transaction) IsCoinbase() bool {
 
 //内部逻辑：
 
-func NewTransaction(from, to string, amount float64, bc *BlockChain, ws *Wallets) *Transaction {
+func NewTransaction(from, to string, amount float64, bc *BlockChain, ws *Wallets, txs []*Transaction) *Transaction {
 	////1.打开钱包
 	//ws := NewWallets()
 
@@ -118,7 +118,7 @@ func NewTransaction(from, to string, amount float64, bc *BlockChain, ws *Wallets
 	utxos := make(map[string][]int64)
 	var resValue float64
 	//遍历账本，找到属于付款人的合适的金额，把这个outputs找到
-	utxos, resValue = bc.FindNeedUtxos(publicKeyHash, amount)
+	utxos, resValue = bc.FindNeedUtxos(publicKeyHash, amount, txs)
 
 	//如果找到钱不足以转账，创建交易失败
 	if resValue < amount {
@@ -158,7 +158,7 @@ func NewTransaction(from, to string, amount float64, bc *BlockChain, ws *Wallets
 	//但是不使用，因为矿工校验的时候，矿工没有这部分信息，矿工需要遍历账本找到所有引用交易
 	//为了统一操作，所以再次查询，进行签名
 
-	bc.SignTranscation(&tx, privateKey)
+	bc.SignTranscation(&tx, privateKey, txs)
 
 	//返回交易结构
 	return &tx

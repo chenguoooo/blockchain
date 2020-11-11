@@ -54,7 +54,7 @@ func (cli *CLI) PrintChain() {
 	i := 0
 	for {
 		block := it.Next()
-		fmt.Printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n")
+		fmt.Printf("+++++++++++++++++++++++++++++区块%d+++++++++++++++++++++++++++++++++\n", i)
 
 		fmt.Printf("Version:%d\n", block.Version)
 		fmt.Printf("PrevBlockHash:%x\n", block.PrevBlockHash)
@@ -144,10 +144,18 @@ func (cli *CLI) CreateWallet() {
 
 func (cli *CLI) ListAddresses() {
 	ws := NewWallets()
+	bc := NewBlockChain()
+	if bc == nil {
+		return
+	}
+	if bc != nil {
+		defer bc.db.Close()
+	}
 
 	addresses := ws.ListAddress()
-	for _, address := range addresses {
-		fmt.Printf("address : %s\n", address)
+	for i, address := range addresses {
+		total := bc.GetBalance(address)
+		fmt.Printf("address %d : %s  total=%v\n", i, address, total)
 	}
 }
 

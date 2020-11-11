@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
 )
 
 ////创建区块链，使用Block数组模拟
@@ -45,7 +44,7 @@ func CreatBlockChain(miner string) *BlockChain {
 		log.Panic(err)
 	}
 
-	//defer db.Close()
+	defer db.Close()
 
 	var tail []byte
 
@@ -115,15 +114,16 @@ func NewBlockChain() *BlockChain {
 func (bc *BlockChain) AddBlock(txs []*Transaction) int64 {
 	//矿工得到交易时，第一时间对交易进行验证
 	//矿工如果不验证，即使挖矿成功，广播区块后，其他的验证矿工，仍然会校验每一笔交易
+	fmt.Printf("串行挖矿中...")
 	validTXs := []*Transaction{}
 	for _, tx := range txs {
-		if bc.VerifyTransaction(tx) && bc.ValidTransaction(validTXs, tx) {
+		if bc.VerifyTransaction(tx, txs) && bc.ValidTransaction(validTXs, tx) {
 			//fmt.Printf("---该交易有效：%x\n", tx.Txid)
 			validTXs = append(validTXs, tx)
 		}
 	}
 	validTXslen := len(validTXs)
-	fmt.Printf("txlen:%d\n", validTXslen)
+	fmt.Printf("validTXslen:%d\n", validTXslen)
 	//创建一个区块
 	bc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blockBucketName))
@@ -146,15 +146,16 @@ func (bc *BlockChain) AddBlock(txs []*Transaction) int64 {
 func (bc *BlockChain) AddBlockParal(txs []*Transaction) int64 {
 	//矿工得到交易时，第一时间对交易进行验证
 	//矿工如果不验证，即使挖矿成功，广播区块后，其他的验证矿工，仍然会校验每一笔交易
-
+	fmt.Printf("并行挖矿中...")
 	validTXs := []*Transaction{}
 	txslen := len(txs)
 	t := make(chan *Transaction, txslen)
 	mutex := make(chan int, txslen)
 	for _, tx := range txs {
 		go func(tx1 *Transaction) {
-			if bc.VerifyTransaction(tx1) {
+			if bc.VerifyTransaction(tx1, txs) {
 				t <- tx1
+				//fmt.Printf("\n运行\n")
 			}
 			mutex <- 1
 		}(tx)
@@ -163,6 +164,7 @@ func (bc *BlockChain) AddBlockParal(txs []*Transaction) int64 {
 	for i := 0; i < len(txs); i++ {
 		<-mutex
 	}
+	close(mutex)
 	tlen := len(t)
 	for i := 0; i < tlen; i++ {
 		tx := <-t
@@ -171,7 +173,7 @@ func (bc *BlockChain) AddBlockParal(txs []*Transaction) int64 {
 		}
 	}
 	validtxslen := len(validTXs)
-	fmt.Printf("txlen:%d\n", validtxslen)
+	fmt.Printf("validtxslen:%d\n", validtxslen)
 	//fmt.Printf("\n%d\n", len(validTXs))
 	//创建一个区块
 	bc.db.Update(func(tx *bolt.Tx) error {
@@ -205,13 +207,13 @@ func (bc *BlockChain) NewIterator() *BlockChainIterator {
 
 }
 
-var mutexView sync.Mutex
+//var mutexView sync.Mutex
 
 //取出当前区块信息，并将指针指向prevblock
 func (it *BlockChainIterator) Next() *Block {
 
 	var block Block
-	mutexView.Lock()
+	//mutexView.Lock()
 	it.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blockBucketName))
 		if b == nil {
@@ -225,7 +227,7 @@ func (it *BlockChainIterator) Next() *Block {
 		it.current = block.PrevBlockHash
 		return nil
 	})
-	mutexView.Unlock()
+	//mutexView.Unlock()
 
 	return &block
 }
@@ -315,13 +317,51 @@ func (bc *BlockChain) GetBalance(address string) (total float64) {
 //遍历账本，找到属于付款人的合适的金额，把这个outputs找到
 //utxos, resValue = bc.FindNeedUtxos(from, amount)
 
-func (bc *BlockChain) FindNeedUtxos(pubKeyHash []byte, amount float64) (map[string][]int64, float64) {
+func (bc *BlockChain) FindNeedUtxos(pubKeyHash []byte, amount float64, txs []*Transaction) (map[string][]int64, float64) {
 
 	needUtxos := make(map[string][]int64)
 	var resValue float64 //统计的金额
 
 	//复用Findmyutxo函数，这个函数已经包含所有信息
 	utxoinfos := bc.FindMyUtxos(pubKeyHash)
+	sUTXOs := make(map[string][]int64)
+	for _, tx := range txs {
+		//遍历交易输入：inputs
+		if tx.IsCoinbase() == false {
+			//如果不是coinbase，说明是普通交易，才有必要进行遍历
+			for _, input := range tx.TXInputs {
+				//判断当前使用的input是否为目标地址所有
+				if bytes.Equal(HashPubKey(input.Pubkey), pubKeyHash) {
+					//fmt.Printf("找到了消耗过的output！index:%d\n", input.Index)
+					key := string(input.TXID)
+					sUTXOs[key] = append(sUTXOs[key], input.Index)
+				}
+			}
+		}
+	OUTPUT:
+		//3.遍历output
+		for i, output := range tx.TXOutputs {
+			key := string(tx.Txid)
+			indexs := sUTXOs[key]
+			if len(indexs) != 0 {
+				//fmt.Printf("当前这笔交易中有被消耗过的output！\n")
+				for _, j := range indexs {
+					if int64(i) == j {
+						//fmt.Printf("i=j,当前的output已经被消耗过了，跳过不统计")
+						continue OUTPUT
+					}
+				}
+			}
+			//4.找到所有属于账户的output
+			if bytes.Equal(pubKeyHash, output.PubKeyHash) {
+				//fmt.Printf("找到了属于%s的output，i:%d\n", address, i)
+				//UTXOs = append(UTXOs, output)
+				utxoinfo := UTXOInfo{tx.Txid, int64(i), output}
+				utxoinfos = append(utxoinfos, utxoinfo)
+			}
+		}
+	}
+
 	for _, utxoinfo := range utxoinfos {
 		key := string(utxoinfo.TXID)
 		needUtxos[key] = append(needUtxos[key], int64(utxoinfo.Index))
@@ -336,13 +376,23 @@ func (bc *BlockChain) FindNeedUtxos(pubKeyHash []byte, amount float64) (map[stri
 	return needUtxos, resValue
 }
 
-func (bc *BlockChain) SignTranscation(tx *Transaction, privateKey *ecdsa.PrivateKey) {
+func (bc *BlockChain) SignTranscation(tx *Transaction, privateKey *ecdsa.PrivateKey, txs []*Transaction) {
 	//1.遍历账本找到所有引用交易
 	prevTXs := make(map[string]Transaction)
 
 	//遍历tx的inputs，通过id去查找所引用的交易
 	for _, input := range tx.TXInputs {
-		prevTx := bc.FindTransaction(input.TXID)
+		var prevTx *Transaction
+
+		for _, tx := range txs {
+			if bytes.Equal(tx.Txid, input.TXID) {
+				//fmt.Printf("找到了所引用的交易，id:%x\n", tx.Txid)
+				prevTx = tx
+			}
+		}
+		if prevTx == nil {
+			prevTx = bc.FindTransaction(input.TXID)
+		}
 
 		if prevTx == nil {
 			fmt.Printf("没有找到交易：%x\n", input.TXID)
@@ -361,7 +411,7 @@ func (bc *BlockChain) SignTranscation(tx *Transaction, privateKey *ecdsa.Private
 //1.找到交易input所引用的交易prevTXs
 //2.对交易进行校验
 
-func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
+func (bc *BlockChain) VerifyTransaction(tx *Transaction, txs []*Transaction) bool {
 	//校验的时候，如果是挖矿交易，直接返回true
 	if tx.IsCoinbase() {
 		return true
@@ -370,10 +420,20 @@ func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
 
 	//遍历tx的inputs，通过id去查找所引用的交易
 	for _, input := range tx.TXInputs {
-		prevTx := bc.FindTransaction(input.TXID)
+		var prevTx *Transaction
+
+		for _, tx := range txs {
+			if bytes.Equal(tx.Txid, input.TXID) {
+				//fmt.Printf("找到了所引用的交易，id:%x\n", tx.Txid)
+				prevTx = tx
+			}
+		}
+		if prevTx == nil {
+			prevTx = bc.FindTransaction(input.TXID)
+		}
 
 		if prevTx == nil {
-			//fmt.Printf("没有找到交易：%x\n", input.TXID)
+			fmt.Printf("没有找到交易：%x\n", input.TXID)
 		} else {
 			//把找到的引用交易保存起来
 			prevTXs[string(input.TXID)] = *prevTx
